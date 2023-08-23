@@ -36,9 +36,8 @@ import sys
 #     3. d_index(t+window) < jump (because the timeseries start at the time when the running window ends)
 
 def read_in_ERA5_index(index, diri, basin, scale):
-    # ds = xr.open_dataset(f'{diri}/ESI7_test.nc{index}{scale}_{basin}.nc')
-    ds = xr.open_dataset(f'{diri}/{index}{scale}_test.nc')
-    da = ds[f'{index}{scale}']
+    ds = xr.open_dataset(f'{diri}/{index}-{scale}_{basin}.nc')
+    da = ds[f'{index}-{scale}']
     return da
 
 
@@ -65,12 +64,30 @@ def compute_FDs(da, dda, window, start_threshold, end_threshold, jump):
         if da.sel(time=i,method='nearest') > start_threshold and da.sel(time=i_end,method='nearest') < end_threshold and dda.sel(time=i_end,method='nearest') < jump:
             flash_drought_dates.append(i.astype('datetime64[D]'))
     df = pd.DataFrame(data={'FD_startdate':flash_drought_dates})
-    return df 
+
+    # cluster events that are consecutive days
+    df['event'] = df['FD_startdate'].diff().dt.days.ne(1).cumsum()
+    # group these events in a new df
+    df_temp = df.groupby('event')['FD_startdate'].agg(['min', 'max'])
+
+    # take individual events that are window+7 days apart from each other and cluster them
+    df_temp['indiv_event'] = df_temp['min'].diff().dt.days.ge(window+7).cumsum()
+
+    # group these events in a new df
+    df_new = df_temp.groupby('indiv_event')['min'].agg(['min'])
+    df_new['FD_startdate'] = df_new['min']
+    df_new = df_new.drop(columns=['min'])
+    df_new['year'] = df_new.FD_startdate.map(lambda x: x.year)
+    df_new['month'] = df_new.FD_startdate.map(lambda x: x.month)
+    df_new['day'] = df_new.FD_startdate.map(lambda x: x.day)
+    
+    return df_new 
 
 
 
 def save_df_tocsv(df, diro, basin, index, scale, window, jump):
-    filo = f'{basin}_{index}{scale}_dwindow{window}_jump{jump}.csv'
+    jumpout = int(abs(jump)*10)
+    filo = f'{basin}_{index}-{scale}_w{window}_j{jumpout}.csv'
     print(diro+filo)
     df.to_csv(diro+filo)  
 
@@ -81,10 +98,13 @@ def main():
     basin = 'Rhine'
     start_threshold = 0
     end_threshold = -1
-    for index in ['SPI','SPEI','ESI','SMI']:
-        for scale in [7,14,21,28]:
-            for window in [7,14,21,28]:
-                for jump in np.arange(-1.5,-5,-0.5): 
+    # for index in ['SPI','SPEI','ESI','SMI']:
+    for index in ['ESI',]:
+        # for scale in [7,14,21,28]:
+        for scale in [14,21]:
+            # for window in [7,14,21,28]:
+            for window in [21,28]:
+                for jump in np.arange(-1.5,-2.5,-0.5): 
                     da = read_in_ERA5_index(index, diri, basin, scale)
                     dda = first_order_deriv_rolling_sum(da, window)
                     df = compute_FDs(da, dda, window, start_threshold, end_threshold, jump)

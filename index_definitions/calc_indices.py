@@ -32,7 +32,7 @@ from rpy2.robjects import pandas2ri
 r_time_series = robjects.r('ts')
 
 def read_in_ERA5(var, diri, basin):
-    ds = xr.open_mfdataset(f'{diri}/{var}_{basin}_19*.nc')
+    ds = xr.open_mfdataset(f'{diri}/{var}_{basin}_????.nc')
     da = ds[var]
     return da
 
@@ -47,7 +47,10 @@ def make_index_timeseries(var, diri,basin):
     elif var == 'es':
         da_et = read_in_ERA5('et', diri, basin)
         da_pet = read_in_ERA5('pet', diri, basin)
-        da = da_et / da_pet        
+        da_et[da_et < 0 ] = 0
+        da_pet[da_pet < 0] = 0
+        da = da_et / da_pet
+        da[da > 5] = 5        
     return da
 
 
@@ -75,16 +78,16 @@ def calc_index_to_netcdf(var, diri, diro, basin, scale):
     # define data with variable attributes as Xarray dataset
 
     if var == 'pr':
-        indexname = f'SPI{scale}'
+        indexname = f'SPI-{scale}'
         explanation = 'precipitation'
     elif var == 'mrsos':
-        indexname = f'SMI{scale}'
+        indexname = f'SMI-{scale}'
         explanation = 'top layer soil moisture'
     elif var == 'wb':
-        indexname = f'SPEI{scale}'
+        indexname = f'SPEI-{scale}'
         explanation = 'water balance (pr - PET)'
     elif var == 'es':
-        indexname = f'ESI{scale}'
+        indexname = f'ESI-{scale}'
         explanation = 'evaporative stress (ET - PET)'
 
 
@@ -136,8 +139,10 @@ def main():
     basin = 'Rhine'
     diri='/scratch/nkkw/Karin/P2_flashdroughts/meteodata_ERA5/'
     diro = '/scratch/nklm/Px_flashdroughts/indices_ERA5'
-    for var in ['pr','mrsos','wb','es']:
+    for var in ['pr','mrsos','wb']:
+        # for var in ['es',]:
         for scale in [7,14,21,28]:
+            #for scale in [7,28]:
             calc_index_to_netcdf(var, diri, diro, basin, scale)
 
 
