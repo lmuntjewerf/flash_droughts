@@ -38,8 +38,11 @@ def read_in_ERA5(var, diri, basin):
 
 
 def make_index_timeseries(var, diri,basin):
-    if var == 'pr' or var == 'mrsos':
+    if var == 'mrsos':
         da = read_in_ERA5(var, diri, basin)
+    elif var == 'pr': 
+        da = read_in_ERA5(var, diri, basin)
+        da[da < 0 ] = 0
     elif var == 'wb':
         da_pr = read_in_ERA5('pr', diri, basin)
         da_pet = read_in_ERA5('pet', diri, basin)

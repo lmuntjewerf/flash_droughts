@@ -85,9 +85,10 @@ def compute_FDs(da, dda, window, start_threshold, end_threshold, jump):
 
 
 
-def save_df_tocsv(df, diro, basin, index, scale, window, jump):
+def save_df_tocsv(df, diro, basin, index, scale, window, jump, end_threshold):
     jumpout = int(abs(jump)*10)
-    filo = f'{basin}_{index}-{scale}_w{window}_j{jumpout}.csv'
+    end_thresholdout = int(abs(end_threshold)*10)
+    filo = f'{basin}_{index}-{scale}_w{window}_j{jumpout}_e{end_thresholdout}.csv'
     print(diro+filo)
     df.to_csv(diro+filo)  
 
@@ -96,19 +97,19 @@ def main():
     diri = '/scratch/nklm/Px_flashdroughts/indices_ERA5/'
     diro = '/perm/nklm/Px_flashdroughts/ERA5_FD_events/'
     basin = 'Rhine'
-    start_threshold = 0
-    end_threshold = -1
-    # for index in ['SPI','SPEI','ESI','SMI']:
-    for index in ['ESI',]:
+    start_threshold = -3
+    end_threshold = -1.5
+    # for index in ['SPI',]: #'SPEI','ESI','SMI']:
+    for index in ['SMI',]:
         # for scale in [7,14,21,28]:
-        for scale in [14,21]:
-            # for window in [7,14,21,28]:
-            for window in [21,28]:
-                for jump in np.arange(-1.5,-2.5,-0.5): 
+        for scale in [7]:
+            for window in [14]:
+                # for window in [21,28]:
+                for jump in np.arange(-1.0,-2.5,-0.5): 
                     da = read_in_ERA5_index(index, diri, basin, scale)
                     dda = first_order_deriv_rolling_sum(da, window)
                     df = compute_FDs(da, dda, window, start_threshold, end_threshold, jump)
-                    save_df_tocsv(df, diro, basin, index, scale, window, jump)
+                    save_df_tocsv(df, diro, basin, index, scale, window, jump, end_threshold)
 
 
 

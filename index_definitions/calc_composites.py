@@ -8,6 +8,23 @@ import sys
 
 from datetime import datetime, timedelta
 
+# def get_info_from_filename(fili):
+#     '''
+#     Purpose: string splitting to extract some information from the input file name.
+
+#     Input: File name of CSV file with all variations in it (string)
+#         example: 'Rhine_ESI14_dwindow21_jump-2.0.csv'
+#     Output: (list of strings, len=4)
+#         basin: River basin (example: Rhine)
+#         indexscale: index + scale (example: ESI14)
+#         window: amount of days over which we take the jump (example: 21)
+#         jump: jump in index (example: 2.0)
+#     '''
+#     basin, indexscale = fili.split('_')[0:-2]
+#     window = int(fili.split('_')[-2][-2::])
+#     jump = int(fili.split('_')[-1].split('.')[0][-2::])/10
+#     return basin, indexscale, window, jump
+
 def get_info_from_filename(fili):
     '''
     Purpose: string splitting to extract some information from the input file name.
@@ -19,13 +36,13 @@ def get_info_from_filename(fili):
         indexscale: index + scale (example: ESI14)
         window: amount of days over which we take the jump (example: 21)
         jump: jump in index (example: 2.0)
+        end_threshold: end threshold of index (example: -1.5)
     '''
-    basin, indexscale = fili.split('_')[0:-2]
-    window = int(fili.split('_')[-2][-2::])
-    jump = int(fili.split('_')[-1].split('.')[0][-2::])/10
-    return basin, indexscale, window, jump
-
-
+    basin, indexscale = fili.split('_')[0:-3]
+    window = int(fili.split('_')[-3][1::])
+    jump = int(fili.split('_')[-2].split('.')[0][-2::])/10
+    end_threshold = int(fili.split('_')[-1].split('.')[0][-2::])/10
+    return basin, indexscale, window, jump, end_threshold
 
 def check_leap_year(year):
     leap_year = False
@@ -56,6 +73,12 @@ def define_ts_length(year,month,day,window,extra_len):
         # is the leap day between the the start of the event and the end of the timeseries: add a day AFTER
         elif start_FD_time <= leap_day <= end_ts_time:
             end_ts_time = datetime(year,month,day) + timedelta(days=(window+extra_len+1))
+    # TODO verbeter leap year voor kerst case 
+    # diri_csv = '/perm/nklm/Px_flashdroughts/ERA5_FD_events/'
+    # fili_csv = 'Rhine_SMI-7_w28_j20_e15.csv'
+    # event 33 
+
+
 
     return start_ts_time, end_ts_time
 
@@ -134,13 +157,20 @@ def make_composites(df, var, window, extra_len, indexscale, basin, anom=False):
             fili = f'{var}_{basin}.nc'
             ds=xr.open_dataset(diri+fili)
         elif var in ['pr','et','pet','tas','rsds','mrsos']:
-            diri = '/scratch/nkkw/Karin/P2_flashdroughts/meteodata_ERA5/'
+            # diri = '/scratch/nkkw/Karin/P2_flashdroughts/meteodata_ERA5/'
+            # if anom: 
+            #     filis = f'{var}_{basin}_????_anom.nc'
+            #     ds=xr.open_mfdataset(diri+filis)
+            # else: 
+            #     filis = f'{var}_{basin}_????.nc'
+            #     ds=xr.open_mfdataset(diri+filis)
+            diri = '/scratch/nklm/Px_flashdroughts/meteodata_ERA5/'
             if anom: 
-                filis = f'{var}_{basin}_????_anom.nc'
-                ds=xr.open_mfdataset(diri+filis)
+                fili = f'{var}_{basin}_anom.nc'
+                ds=xr.open_dataset(diri+fili)
             else: 
-                filis = f'{var}_{basin}_????.nc'
-                ds=xr.open_mfdataset(diri+filis)
+                fili = f'{var}_{basin}.nc'
+                ds=xr.open_dataset(diri+fili)
 
         # da = ds['ESI14'].sel(time=slice(start_ts_time,end_ts_time))
         da = ds[var].sel(time=slice(start_ts_time,end_ts_time))
@@ -157,7 +187,7 @@ def make_composites(df, var, window, extra_len, indexscale, basin, anom=False):
     ds_combined = xr.concat(timeseries, dim='event')
     return ds_combined
 
-def save_as_netcdf(ds, var, basin, index, scale, window, jump, diro, anom=False):
+def save_as_netcdf(ds, var, basin, index, scale, window, jump, diro,end_threshold, anom=False):
     '''
     Purpose: Save ds of composite data to netcdf in right location for var == varname
     mind encoding, otherwise it will throw error when opening with nvciew 
@@ -169,11 +199,12 @@ def save_as_netcdf(ds, var, basin, index, scale, window, jump, diro, anom=False)
     Out: netcdf file saved in f'{diro}/{filo}' 
     '''
     jumpout = int(abs(jump)*10)
+    end_thresholdout = int(abs(end_threshold)*10)
 
     if anom: 
-        filo = f'{var}_anom_{basin}_{index}-{scale}_w{window}_j{jumpout}.nc'
+        filo = f'{var}_anom_{basin}_{index}-{scale}_w{window}_j{jumpout}_e{end_thresholdout}.nc'
     else: 
-        filo = f'{var}_{basin}_{index}-{scale}_w{window}_j{jumpout}.nc'
+        filo = f'{var}_{basin}_{index}-{scale}_w{window}_j{jumpout}_e{end_thresholdout}.nc'
 
     ds.to_netcdf(diro+filo, unlimited_dims='event', encoding={'time': {'dtype': 'i4'}, 'event': {'dtype': 'i4'}})
 
@@ -184,28 +215,33 @@ def main():
     diro = '/scratch/nklm/Px_flashdroughts/composites/'
     basin = 'Rhine'
     extra_len = int(65)
+    end_threshold = -1.5
 
     # vars = ['SPI-14', 'tas']
     # vars = ['ESI-14',]
-    vars = ['pr','et','pet','tas','rsds','mrsos']
+    # vars = ['pr','et','pet','tas','rsds','mrsos']
+    # vars = ['SMI-7', 'SPEI-28', 'SPI-28']
+    vars = ['ESI-14',]
     anom = False
 
 
     #for index in ['SPI','SPEI','ESI','SMI']:
-    for index in ['ESI',]:
+    for index in ['SPEI','ESI',]:
         # for scale in [7,14,21,28]:
-        for scale in [14,]:
+        for scale in [14,21]:
             # for window in [7,14,21,28]:
             for window in [21,28]:
                 for jump in np.arange(-1.5,-2.5,-0.5): 
                     jumpout = int(abs(jump)*10)
-                    fili = f'{basin}_{index}-{scale}_w{window}_j{jumpout}.csv'
+                    end_thresholdout = int(abs(end_threshold)*10)
+                    fili = f'{basin}_{index}-{scale}_w{window}_j{jumpout}_e{end_thresholdout}.csv'
                     df = pd.read_csv(diri+fili,index_col=0)
-                    basin, indexscale, window, jump = get_info_from_filename(fili)
+                    basin, indexscale, window, jump, end_threshold = get_info_from_filename(fili)
+                    # basin, indexscale, window, jump = get_info_from_filename(fili)
 
                     for var in vars: 
                         ds = make_composites(df, var, window, extra_len, indexscale, basin, anom)
-                        save_as_netcdf(ds, var, basin, index, scale, window, jump, diro, anom)
+                        save_as_netcdf(ds, var, basin, index, scale, window, jump, diro, end_threshold, anom)
                     
 
 
