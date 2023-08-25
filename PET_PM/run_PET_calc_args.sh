@@ -9,11 +9,10 @@
 #
 #-------------------
 
-diri=
-freq='day'
+diri='/scratch/nklm/Px_flashdroughts/PET_data/'
 startyear=2020
 endyear=2022
 
 for year in $(seq $startyear $endyear); do 
-  python3 calc_Rnet_PET.py --diri $diri --freq $freq -y $year
+  python3 calc_PET.py --diri $diri -y $year
 done
