@@ -31,25 +31,29 @@ from rpy2.robjects import pandas2ri
 # import functions (and packages) from R
 r_time_series = robjects.r('ts')
 
-def read_in_ERA5(var, diri, basin):
-    ds = xr.open_mfdataset(f'{diri}/{var}_{basin}_????.nc')
+def read_in_ERA5(var, diri, basin, detrended=False):
+    if detrended:
+        ds = xr.open_dataset(f'{diri}/{basin}/{var}_{basin}_detrend.nc')
+    else:
+        ds = xr.open_dataset(f'{diri}/{basin}/{var}_{basin}.nc')
+
     da = ds[var]
     return da
 
 
-def make_index_timeseries(var, diri,basin):
-    if var == 'mrsos':
-        da = read_in_ERA5(var, diri, basin)
+def make_index_timeseries(var, diri,basin, detrended=False):
+    if var == 'mrsos' or var == 'SWIs':
+        da = read_in_ERA5(var, diri, basin, detrended)
     elif var == 'pr': 
-        da = read_in_ERA5(var, diri, basin)
+        da = read_in_ERA5(var, diri, basin, detrended)
         da[da < 0 ] = 0
     elif var == 'wb':
-        da_pr = read_in_ERA5('pr', diri, basin)
-        da_pet = read_in_ERA5('pet', diri, basin)
+        da_pr = read_in_ERA5('pr', diri, basin, detrended)
+        da_pet = read_in_ERA5('pet', diri, basin, detrended)
         da = da_pr - da_pet
     elif var == 'es':
-        da_et = read_in_ERA5('et', diri, basin)
-        da_pet = read_in_ERA5('pet', diri, basin)
+        da_et = read_in_ERA5('et', diri, basin, detrended)
+        da_pet = read_in_ERA5('pet', diri, basin, detrended)
         da_et[da_et < 0 ] = 0
         da_pet[da_pet < 0] = 0
         da = da_et / da_pet
@@ -73,9 +77,9 @@ def calc_standardized_index_daily(da, scale):
     return da_standardized_index
 
 
-def calc_index_to_netcdf(var, diri, diro, basin, scale):
+def calc_index_to_netcdf(var, diri, diro, basin, scale, detrended=False):
 
-    da = make_index_timeseries(var, diri,basin)
+    da = make_index_timeseries(var, diri,basin, detrended)
     da_standardized_index = calc_standardized_index_daily(da, scale)
 
     # define data with variable attributes as Xarray dataset
@@ -86,6 +90,9 @@ def calc_index_to_netcdf(var, diri, diro, basin, scale):
     elif var == 'mrsos':
         indexname = f'SMI-{scale}'
         explanation = 'top layer soil moisture'
+    elif var == 'SWIs':
+        indexname = f'SWIs-{scale}'
+        explanation = 'top layer soil water index'
     elif var == 'wb':
         indexname = f'SPEI-{scale}'
         explanation = 'water balance (pr - PET)'
@@ -134,19 +141,24 @@ def calc_index_to_netcdf(var, diri, diro, basin, scale):
     ds_new[indexname] = ds_new['index']
     ds_new = ds_new.drop(['index'])
 
-    ds_new.to_netcdf(f'{diro}/{indexname}_{basin}.nc')
+    if detrended:
+        filo=f'{indexname}_{basin}_detrended.nc'
+    else: 
+       filo=f'{indexname}_{basin}.nc'
+    ds_new.to_netcdf(f'{diro}/{filo}')
 
 
 
 def main():
-    basin = 'Rhine'
+    detrended=True
+    basin = 'Danube'
     diri='/scratch/nkkw/Karin/P2_flashdroughts/meteodata_ERA5/'
     diro = '/scratch/nklm/Px_flashdroughts/indices_ERA5'
-    for var in ['pr','mrsos','wb']:
+    for var in ['pr','SWIs','wb','es']:
         # for var in ['es',]:
         for scale in [7,14,21,28]:
             #for scale in [7,28]:
-            calc_index_to_netcdf(var, diri, diro, basin, scale)
+            calc_index_to_netcdf(var, diri, diro, basin, scale,detrended)
 
 
 if __name__ == '__main__':

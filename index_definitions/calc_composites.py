@@ -63,20 +63,48 @@ def define_ts_length(year,month,day,window,extra_len):
     start_ts_time = datetime(year,month,day) + timedelta(days=-(extra_len))
     end_ts_time = datetime(year,month,day) + timedelta(days=(window+extra_len))
 
-    # however, if there is a leap day in this period, we need to add an extra day to the time series before or after  
-    if check_leap_year(year):
+    if check_leap_year(year+1): 
+        leap_day = datetime(year+1,2,29)
+        # is next years leap day between the start of the timeseries and the start of the event: add a day BEFORE
+        print(start_ts_time)
+        print(leap_day)
+        print(start_FD_time)
+        print(end_ts_time)
+        if start_ts_time <= leap_day <= start_FD_time:
+            # this is always false, in principe, because we are in the year BEFORE the leapday. 
+            start_ts_time = datetime(year,month,day) + timedelta(days=-(extra_len+1))
+        elif start_FD_time <= leap_day <= end_ts_time:
+            # this can be true for any start_FD_time day between 01-12 and 31-12 in the year BEFORE the leapday.  
+            end_ts_time = datetime(year,month,day) + timedelta(days=(window+extra_len+1))
+
+    elif check_leap_year(year):
         leap_day = datetime(year,2,29)
-        
+
         # is the leap day between the start of the timeseries and the start of the event: add a day BEFORE
         if start_ts_time <= leap_day <= start_FD_time:
             start_ts_time = datetime(year,month,day) + timedelta(days=-(extra_len+1))
         # is the leap day between the the start of the event and the end of the timeseries: add a day AFTER
         elif start_FD_time <= leap_day <= end_ts_time:
             end_ts_time = datetime(year,month,day) + timedelta(days=(window+extra_len+1))
-    # TODO verbeter leap year voor kerst case 
-    # diri_csv = '/perm/nklm/Px_flashdroughts/ERA5_FD_events/'
-    # fili_csv = 'Rhine_SMI-7_w28_j20_e15.csv'
-    # event 33 
+
+
+
+    # # however, if there is a leap day in this period, we need to add an extra day to the time series before or after  
+    # if check_leap_year(year):
+    #     leap_day = datetime(year,2,29)
+        
+    #     # is the leap day between the start of the timeseries and the start of the event: add a day BEFORE
+    #     if start_ts_time <= leap_day <= start_FD_time:
+    #         start_ts_time = datetime(year,month,day) + timedelta(days=-(extra_len+1))
+    #     # is the leap day between the the start of the event and the end of the timeseries: add a day AFTER
+    #     elif start_FD_time <= leap_day <= end_ts_time:
+    #         end_ts_time = datetime(year,month,day) + timedelta(days=(window+extra_len+1))
+
+    
+    # # TODO verbeter leap year voor kerst case 
+    # # diri_csv = '/perm/nklm/Px_flashdroughts/ERA5_FD_events/'
+    # # fili_csv = 'Rhine_SMI-7_w28_j20_e15.csv'
+    # # event 33 
 
 
 
